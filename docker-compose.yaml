@@ -1,0 +1,113 @@
+services:
+  postgres:
+    image: ${POSTGRES_VERSION}
+    container_name: ${APP_NAME}-postgres
+    hostname: ${POSTGRES_HOST}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data-sync/postgres-db-sync:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      data-network:
+        aliases:
+          - ${POSTGRES_HOST}
+
+  pgadmin:
+    image: ${PGADMIN_VERSION}
+    container_name: ${APP_NAME}-pgadmin
+    hostname: ${PGADMIN_HOST}
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    depends_on:
+      - postgres
+    ports:
+      - "5050:80"
+    restart: unless-stopped
+    networks:
+      data-network:
+        aliases:
+          - ${PGADMIN_HOST}
+
+  mongodb:
+    image: ${MONGO_VERSION}
+    container_name: ${APP_NAME}-mongodb
+    hostname: ${MONGO_HOST}
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data-sync/mongodb-db-sync:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      data-network:
+        aliases:
+          - ${MONGO_HOST}
+
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    container_name: ${APP_NAME}-dynamodb
+    hostname: dynamodb
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data"
+    working_dir: /home/dynamodblocal
+    ports:
+      - "9000:8000"
+    volumes:
+      - ./data-sync/dynamodb-data:/home/dynamodblocal/data
+    restart: unless-stopped
+    networks:
+      data-network:
+        aliases:
+          - dynamodb
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: docker/fastapi/Dockerfile
+    container_name: ${APP_NAME}-fastapi
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      MONGO_HOST: ${MONGO_HOST}
+      DYNAMODB_ENDPOINT: http://dynamodb:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      dynamodb:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - data-network
+
+volumes:
+  mongodb-db-sync:
+  postgres-db-sync:
+
+networks:
+  data-network:
+    driver: bridge
