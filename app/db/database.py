@@ -1,5 +1,6 @@
 import logging
 import os
+from contextlib import contextmanager
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -23,3 +24,15 @@ def get_db_connection():
     except (psycopg2.Error, KeyError, ValueError):
         logger.exception("Database connection failed")
         raise
+
+
+@contextmanager
+def managed_db_connection():
+    connection = get_db_connection()
+    try:
+        yield connection
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
