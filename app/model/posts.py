@@ -9,14 +9,14 @@ from ..helper.helpers import find_post, my_posts
 
 logger = logging.getLogger(__name__)
 
-
 def root():
     return {"message": "Hello World"}
 
 
 def get_posts():
-    db_connection = get_db_connection()
+    db_connection = None
     try:
+        db_connection = get_db_connection()
         with db_connection.cursor() as cursor:
             cursor.execute("SELECT * FROM posts")
             posts = cursor.fetchall()
@@ -26,12 +26,16 @@ def get_posts():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch posts from the database",
         )
+    finally:
+        if db_connection is not None:
+            db_connection.close()
     return {"data": posts}
 
 
 def create_post(post_dict: dict):
-    db_connection = get_db_connection()
+    db_connection = None
     try:
+        db_connection = get_db_connection()
         with db_connection.cursor() as cursor:
             cursor.execute(
                 "INSERT INTO posts (title, content, published) VALUES (%s, %s, %s) RETURNING *",
@@ -48,12 +52,14 @@ def create_post(post_dict: dict):
             detail="Failed to create a new post in the database",
         )
     finally:
-        db_connection.close()
+        if db_connection is not None:
+            db_connection.close()
 
 
 def get_latest_post():
-    db_connection = get_db_connection()
+    db_connection = None
     try:
+        db_connection = get_db_connection()
         with db_connection.cursor() as cursor:
             cursor.execute("SELECT * FROM posts ORDER BY created_at DESC LIMIT 1")
             latest_post = cursor.fetchone()
@@ -64,15 +70,17 @@ def get_latest_post():
             detail="Failed to fetch the latest post from the database",
         )
     finally:
-        db_connection.close()
+        if db_connection is not None:
+            db_connection.close()
         
     return {"data": latest_post}
 
 
 
 def get_post(post_id: int):
-    db_connection = get_db_connection()
+    db_connection = None
     try:
+        db_connection = get_db_connection()
         with db_connection.cursor() as cursor:
             cursor.execute("SELECT * FROM posts WHERE id = %s", (post_id,))
             post = cursor.fetchone()
@@ -83,15 +91,18 @@ def get_post(post_id: int):
             detail="Failed to fetch post from the database",
         )
     finally:
-        db_connection.close()
+        if db_connection is not None:
+            db_connection.close()
         
     return {"data": post}
 
 def delete_post(post_id: int):
-    db_connection = get_db_connection()
+    db_connection = None
     try:
+        db_connection = get_db_connection()
         with db_connection.cursor() as cursor:
             cursor.execute("DELETE FROM posts WHERE id = %s", (post_id,))
+        db_connection.commit()
     except psycopg2.Error:
         logger.exception("Failed to delete post from the database")
         raise HTTPException(
@@ -99,16 +110,19 @@ def delete_post(post_id: int):
             detail="Failed to delete post from the database",
         )
     finally:
-        db_connection.close()
+        if db_connection is not None:
+            db_connection.close()
   
 
 
 def update_post(post_id: int, post_dict: dict):
     post_dict["id"] = post_id
-    db_connection = get_db_connection()
+    db_connection = None
     try:
+        db_connection = get_db_connection()
         with db_connection.cursor() as cursor:
             cursor.execute("UPDATE posts SET title = %s, content = %s WHERE id = %s", (post_dict["title"], post_dict["content"], post_id))
+        db_connection.commit()
     except psycopg2.Error:
         logger.exception("Failed to update post in the database")
         raise HTTPException(
@@ -116,7 +130,8 @@ def update_post(post_id: int, post_dict: dict):
             detail="Failed to update post in the database",
         )
     finally:
-        db_connection.close()
+        if db_connection is not None:
+            db_connection.close()
         
     return {"data": post_dict}
     
