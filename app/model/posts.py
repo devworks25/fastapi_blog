@@ -102,6 +102,11 @@ def delete_post(post_id: int):
         db_connection = get_db_connection()
         with db_connection.cursor() as cursor:
             cursor.execute("DELETE FROM posts WHERE id = %s", (post_id,))
+            if cursor.rowcount == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Post with id {post_id} not found",
+                )
         db_connection.commit()
     except psycopg2.Error:
         logger.exception("Failed to delete post from the database")
@@ -122,6 +127,11 @@ def update_post(post_id: int, post_dict: dict):
         db_connection = get_db_connection()
         with db_connection.cursor() as cursor:
             cursor.execute("UPDATE posts SET title = %s, content = %s WHERE id = %s", (post_dict["title"], post_dict["content"], post_id))
+            if cursor.rowcount == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Post with id {post_id} not found",
+                )
         db_connection.commit()
     except psycopg2.Error:
         logger.exception("Failed to update post in the database")
