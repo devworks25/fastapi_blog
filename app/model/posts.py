@@ -20,6 +20,11 @@ def get_posts():
         with db_connection.cursor() as cursor:
             cursor.execute("SELECT * FROM posts")
             posts = cursor.fetchall()
+        if not posts:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No posts found",
+            )
     except psycopg2.Error:
         logger.exception("Failed to fetch posts from the database")
         raise HTTPException(
@@ -63,6 +68,11 @@ def get_latest_post():
         with db_connection.cursor() as cursor:
             cursor.execute("SELECT * FROM posts ORDER BY created_at DESC LIMIT 1")
             latest_post = cursor.fetchone()
+        if latest_post is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No posts found",
+            )
     except psycopg2.Error:
         logger.exception("Failed to fetch the latest post from the database")
         raise HTTPException(
@@ -84,6 +94,11 @@ def get_post(post_id: int):
         with db_connection.cursor() as cursor:
             cursor.execute("SELECT * FROM posts WHERE id = %s", (post_id,))
             post = cursor.fetchone()
+        if post is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Post with id {post_id} not found",
+            )
     except psycopg2.Error:
         logger.exception("Failed to fetch post from the database")
         raise HTTPException(
