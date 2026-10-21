@@ -30,9 +30,25 @@ def get_posts():
 
 
 def create_post(post_dict: dict):
-    post_dict["id"] = randrange(0, 1_000_000)
-    my_posts.append(post_dict)
-    return {"data": post_dict}
+    db_connection = get_db_connection()
+    try:
+        with db_connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO posts (title, content, published) VALUES (%s, %s, %s) RETURNING *",
+                (post_dict["title"], post_dict["content"], post_dict["published"]),
+            )
+            new_post = cursor.fetchone()
+        db_connection.commit()
+        return {"data": new_post}
+    except psycopg2.Error:
+        db_connection.rollback()
+        logger.exception("Failed to create a new post in the database")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create a new post in the database",
+        )
+    finally:
+        db_connection.close()
 
 
 def get_latest_post():

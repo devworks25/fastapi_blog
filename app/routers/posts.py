@@ -1,18 +1,9 @@
-from typing import Optional
-
 from fastapi import APIRouter, status
-from pydantic import BaseModel
 
 from ..model import posts as post_logic
+from ..schemas.posts import Post
 
 router = APIRouter()
-
-
-class Post(BaseModel):
-    title: str
-    content: str
-    published: bool = True
-    rating: Optional[int] = None
 
 
 @router.get("/")
