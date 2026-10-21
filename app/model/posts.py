@@ -1,8 +1,17 @@
-import psycopg2
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from fastapi import status
 
-from ..db.database import managed_db_connection
+from ..db.database import managed_db_session
 from ..helper.exceptions import raise_database_exception, raise_http_exception
+from ..db.models import PostRecord
+
+
+def _post_to_dict(post: PostRecord) -> dict:
+    return {
+        column.name: getattr(post, column.name)
+        for column in PostRecord.__table__.columns
+    }
 
 
 def root():
@@ -11,91 +20,86 @@ def root():
 
 def get_posts():
     try:
-        with managed_db_connection() as db_connection:
-            with db_connection.cursor() as cursor:
-                cursor.execute("SELECT * FROM posts")
-                posts = cursor.fetchall()
+        with managed_db_session() as session:
+            posts = session.scalars(select(PostRecord)).all()
         if not posts:
             raise_http_exception(status.HTTP_404_NOT_FOUND, "No posts found")
-    except psycopg2.Error:
+    except SQLAlchemyError:
         raise_database_exception("Failed to fetch posts from the database")
-    return {"data": posts}
+    return {"data": [_post_to_dict(post) for post in posts]}
 
 
 def create_post(post_dict: dict):
     try:
-        with managed_db_connection() as db_connection:
-            with db_connection.cursor() as cursor:
-                cursor.execute(
-                    "INSERT INTO posts (title, content, published) VALUES (%s, %s, %s) RETURNING *",
-                    (post_dict["title"], post_dict["content"], post_dict["published"]),
-                )
-                new_post = cursor.fetchone()
-            db_connection.commit()
-        return {"data": new_post}
-    except psycopg2.Error:
+        with managed_db_session() as session:
+            post = PostRecord(
+                title=post_dict["title"],
+                content=post_dict["content"],
+                published=post_dict["published"],
+            )
+            session.add(post)
+            session.commit()
+            session.refresh(post)
+            return {"data": _post_to_dict(post)}
+    except SQLAlchemyError:
         raise_database_exception("Failed to create a new post in the database")
 
 
 def get_latest_post():
     try:
-        with managed_db_connection() as db_connection:
-            with db_connection.cursor() as cursor:
-                cursor.execute("SELECT * FROM posts ORDER BY created_at DESC LIMIT 1")
-                latest_post = cursor.fetchone()
+        with managed_db_session() as session:
+            latest_post = session.scalar(
+                select(PostRecord).order_by(PostRecord.created_at.desc()).limit(1)
+            )
         if latest_post is None:
             raise_http_exception(status.HTTP_404_NOT_FOUND, "No posts found")
-    except psycopg2.Error:
+    except SQLAlchemyError:
         raise_database_exception("Failed to fetch the latest post from the database")
-    return {"data": latest_post}
+    return {"data": _post_to_dict(latest_post)}
 
 
 
 def get_post(post_id: int):
     try:
-        with managed_db_connection() as db_connection:
-            with db_connection.cursor() as cursor:
-                cursor.execute("SELECT * FROM posts WHERE id = %s", (post_id,))
-                post = cursor.fetchone()
+        with managed_db_session() as session:
+            post = session.get(PostRecord, post_id)
         if post is None:
             raise_http_exception(
                 status.HTTP_404_NOT_FOUND,
                 f"Post with id {post_id} not found",
             )
-    except psycopg2.Error:
+    except SQLAlchemyError:
         raise_database_exception("Failed to fetch post from the database")
-    return {"data": post}
+    return {"data": _post_to_dict(post)}
 
 def delete_post(post_id: int):
     try:
-        with managed_db_connection() as db_connection:
-            with db_connection.cursor() as cursor:
-                cursor.execute("DELETE FROM posts WHERE id = %s", (post_id,))
-                if cursor.rowcount == 0:
-                    raise_http_exception(
-                        status.HTTP_404_NOT_FOUND,
-                        f"Post with id {post_id} not found",
-                    )
-            db_connection.commit()
-    except psycopg2.Error:
+        with managed_db_session() as session:
+            post = session.get(PostRecord, post_id)
+            if post is None:
+                raise_http_exception(
+                    status.HTTP_404_NOT_FOUND,
+                    f"Post with id {post_id} not found",
+                )
+            session.delete(post)
+            session.commit()
+    except SQLAlchemyError:
         raise_database_exception("Failed to delete post from the database")
 
 
 def update_post(post_id: int, post_dict: dict):
     updated_post = {**post_dict, "id": post_id}
     try:
-        with managed_db_connection() as db_connection:
-            with db_connection.cursor() as cursor:
-                cursor.execute(
-                    "UPDATE posts SET title = %s, content = %s WHERE id = %s",
-                    (updated_post["title"], updated_post["content"], post_id),
+        with managed_db_session() as session:
+            post = session.get(PostRecord, post_id)
+            if post is None:
+                raise_http_exception(
+                    status.HTTP_404_NOT_FOUND,
+                    f"Post with id {post_id} not found",
                 )
-                if cursor.rowcount == 0:
-                    raise_http_exception(
-                        status.HTTP_404_NOT_FOUND,
-                        f"Post with id {post_id} not found",
-                    )
-            db_connection.commit()
-    except psycopg2.Error:
+            post.title = updated_post["title"]
+            post.content = updated_post["content"]
+            session.commit()
+    except SQLAlchemyError:
         raise_database_exception("Failed to update post in the database")
     return {"data": updated_post}
