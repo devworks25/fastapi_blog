@@ -18,7 +18,7 @@ database_url = URL.create(
     database=os.getenv("DB_NAME", "fastapi_blog"),
 )
 engine = create_engine(database_url, pool_pre_ping=True, connect_args={"connect_timeout": 5})
-SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False,autocommit=False)
 
 
 class Base(DeclarativeBase):

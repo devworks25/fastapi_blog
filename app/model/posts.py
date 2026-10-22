@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select,inspect
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import status
 
@@ -15,7 +15,28 @@ def _post_to_dict(post: PostRecord) -> dict:
 
 
 def root():
-    return {"message": "Hello World"}
+    try:
+        with managed_db_session() as session:
+            inspector = inspect(session.get_bind())
+
+            if not inspector.has_table("posts"):
+                raise_http_exception(
+                    status.HTTP_503_SERVICE_UNAVAILABLE,
+                    "Required database table 'posts' is missing",
+                )
+
+            session.execute(select(1))
+
+    except SQLAlchemyError:
+        raise_http_exception(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "App health check failed",
+        )
+
+    return {
+        "status": "healthy",
+        "message": "App is healthy",
+    }
 
 
 def get_posts():
@@ -32,11 +53,7 @@ def get_posts():
 def create_post(post_dict: dict):
     try:
         with managed_db_session() as session:
-            post = PostRecord(
-                title=post_dict["title"],
-                content=post_dict["content"],
-                published=post_dict["published"],
-            )
+            post = PostRecord(**post_dict)
             session.add(post)
             session.commit()
             session.refresh(post)
