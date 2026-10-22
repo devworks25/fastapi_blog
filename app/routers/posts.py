@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status
 
 from ..model import posts as post_logic
-from ..schemas.posts import Post
+from ..schemas.post_schema import PostCreate, PostListResponse, PostUpdate, PostResponse
 
 router = APIRouter()
 
@@ -11,22 +11,22 @@ async def root():
     return post_logic.root()
 
 
-@router.get("/posts", status_code=status.HTTP_200_OK)
+@router.get("/posts", status_code=status.HTTP_200_OK, response_model=PostListResponse)
 async def get_posts():
     return post_logic.get_posts()
 
 
-@router.post("/posts", status_code=status.HTTP_201_CREATED)
-async def create_post(post: Post):
+@router.post("/posts", status_code=status.HTTP_201_CREATED,response_model=PostResponse)
+async def create_post(post: PostCreate):
     return post_logic.create_post(post.dict())
 
 
-@router.get("/posts/latest", status_code=status.HTTP_200_OK)
+@router.get("/posts/latest", status_code=status.HTTP_200_OK,response_model=PostResponse)
 async def get_latest_post():
     return post_logic.get_latest_post()
 
 
-@router.get("/posts/{id}", status_code=status.HTTP_200_OK)
+@router.get("/posts/{id}", status_code=status.HTTP_200_OK,response_model=PostResponse)
 async def get_post(id: int):
     return post_logic.get_post(id)
 
@@ -36,6 +36,6 @@ async def delete_post(id: int):
     return post_logic.delete_post(id)
 
 
-@router.put("/posts/{id}", status_code=status.HTTP_200_OK)
-async def update_post(id: int, post: Post):
+@router.put("/posts/{id}", status_code=status.HTTP_200_OK,response_model=PostResponse)
+async def update_post(id: int, post: PostUpdate):
     return post_logic.update_post(id, post.dict())
