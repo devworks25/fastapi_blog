@@ -97,6 +97,9 @@ services:
       DB_PORT: 5432
       MONGO_HOST: ${MONGO_HOST}
       DYNAMODB_ENDPOINT: http://dynamodb:8000
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
@@ -104,13 +107,39 @@ services:
         condition: service_healthy
       dynamodb:
         condition: service_started
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - data-network
 
+  redis:
+    image: ${REDIS_VERSION}
+    container_name: ${APP_NAME}-redis
+    hostname: ${REDIS_HOST}
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-db-sync:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      data-network:
+        aliases:
+          - ${REDIS_HOST}
+
 volumes:
   mongodb-db-sync:
   postgres-db-sync:
+  redis-db-sync:
 
 networks:
   data-network:
