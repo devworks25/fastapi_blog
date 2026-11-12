@@ -4,7 +4,36 @@ WORKDIR /app
 
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends build-essential libpq-dev libpq5 \
-	&& pip install --no-cache-dir fastapi["all"] "uvicorn[standard]" psycopg2 sqlalchemy \
+	&& pip install --no-cache-dir \
+		"fastapi[all]" \
+		"uvicorn[standard]" \
+		psycopg2 \
+		sqlalchemy \
+		openai \
+		httpx \
+		langchain \
+		langchain-core \
+		langchain-community \
+		langchain-openai \
+		langchain-text-splitters \
+		langchain-tavily \
+		langchain-experimental \
+		langchain-chroma \
+		langchain-pinecone \
+		chromadb \
+		langgraph \
+		langsmith \
+		python-dotenv \
+		tiktoken \
+		pydantic \
+		numpy \
+		tenacity \
+		pypdf \
+		docx2txt \
+		openpyxl \
+		xlrd \
+		python-pptx \
+		redis \
 	&& apt-get purge -y --auto-remove build-essential libpq-dev \
 	&& rm -rf /var/lib/apt/lists/*
 
